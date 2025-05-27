@@ -1,5 +1,6 @@
 <?php
-// Debug what the form is actually sending
+require_once '../config/config.php';
+
 if ($_POST) {
     echo "<h3>Raw POST Data:</h3>";
     echo "<pre>";
@@ -17,10 +18,10 @@ if ($_POST) {
     echo "Critical: '" . (isset($_POST['critical_device']) ? 'YES' : 'NO') . "'<br>";
 }
 ?>
- 
+
 <form method="POST">
     <p>Name: <input type="text" name="name" value="TestDevice"></p>
-IP: <input type="text" name="ip_address" value="1.2.3.4"></p>
+    <p>IP: <input type="text" name="ip_address" value="1.2.3.4"></p>
     <p>Group: <select name="device_group"><option value="routers">Routers</option></select></p>
     <p>Type: <select name="monitor_type"><option value="ping">Ping</option></select></p>
     <p>Port: <input type="text" name="port" value=""></p>
