@@ -84,6 +84,10 @@ if ($page === 'login') {
                 $controller = new ReportController();
                 $controller->getSystemOverview();
                 break;
+            case 'debug_info':
+                $controller = new ReportController();
+                $controller->debugInfo();
+                break;
             default:
                 echo json_encode(['error' => 'Unknown action: ' . $action]);
         }

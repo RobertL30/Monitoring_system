@@ -3,6 +3,129 @@ class ReportController {
     private $deviceModel;
     private $db;
 
+
+    public function debugInfo() {
+        try {
+            // Test database connection
+            $testQuery = $this->db->query("SELECT COUNT(*) as device_count FROM devices");
+            $deviceCount = $testQuery->fetch()['device_count'];
+
+            // Test dashboard data
+            $stmt = $this->db->query("
+            SELECT 
+                COUNT(*) as total_devices,
+                SUM(CASE WHEN ds.status = 'operational' THEN 1 ELSE 0 END) as operational,
+                SUM(CASE WHEN ds.status = 'degraded' THEN 1 ELSE 0 END) as degraded,
+                SUM(CASE WHEN ds.status = 'down' THEN 1 ELSE 0 END) as down
+            FROM devices d
+            LEFT JOIN device_status ds ON d.id = ds.device_id
+            WHERE d.enabled = 1
+        ");
+            $stats = $stmt->fetch();
+
+            echo json_encode([
+                'success' => true,
+                'database_connected' => true,
+                'device_count' => $deviceCount,
+                'stats' => $stats,
+                'timestamp' => date('Y-m-d H:i:s'),
+                'php_version' => PHP_VERSION,
+                'session_data' => [
+                    'user_id' => $_SESSION['user_id'] ?? 'not_set',
+                    'username' => $_SESSION['username'] ?? 'not_set',
+                    'role' => $_SESSION['role'] ?? 'not_set'
+                ]
+            ]);
+
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+// Modified getSystemOverview with better error handling
+    public function getSystemOverview() {
+        try {
+            error_log("ReportController::getSystemOverview called");
+
+            // Get overall system stats
+            $stmt = $this->db->query("
+            SELECT 
+                COUNT(*) as total_devices,
+                SUM(CASE WHEN ds.status = 'operational' THEN 1 ELSE 0 END) as operational,
+                SUM(CASE WHEN ds.status = 'degraded' THEN 1 ELSE 0 END) as degraded,
+                SUM(CASE WHEN ds.status = 'down' THEN 1 ELSE 0 END) as down,
+                SUM(CASE WHEN ds.status IS NULL OR ds.status = 'unknown' THEN 1 ELSE 0 END) as unknown,
+                AVG(CASE WHEN ds.status = 'operational' THEN ds.response_time END) as avg_response_time,
+                SUM(CASE WHEN d.critical_device = 1 AND ds.status != 'operational' THEN 1 ELSE 0 END) as critical_issues
+            FROM devices d
+            LEFT JOIN device_status ds ON d.id = ds.device_id
+            WHERE d.enabled = 1
+        ");
+            $systemStats = $stmt->fetch();
+
+            error_log("System stats: " . print_r($systemStats, true));
+
+            // Get category breakdown
+            $stmt = $this->db->query("
+            SELECT 
+                d.device_group,
+                COUNT(*) as device_count,
+                SUM(CASE WHEN ds.status = 'operational' THEN 1 ELSE 0 END) as operational,
+                SUM(CASE WHEN ds.status = 'degraded' THEN 1 ELSE 0 END) as degraded,
+                SUM(CASE WHEN ds.status = 'down' THEN 1 ELSE 0 END) as down
+            FROM devices d
+            LEFT JOIN device_status ds ON d.id = ds.device_id
+            WHERE d.enabled = 1
+            GROUP BY d.device_group
+        ");
+            $categoryBreakdown = $stmt->fetchAll();
+
+            error_log("Category breakdown: " . print_r($categoryBreakdown, true));
+
+            // Get recent system-wide response times for trending
+            $stmt = $this->db->query("
+            SELECT 
+                DATE_FORMAT(timestamp, '%H:00') as hour,
+                AVG(response_time) as avg_response_time
+            FROM monitoring_history 
+            WHERE timestamp > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+            AND success = 1
+            GROUP BY DATE_FORMAT(timestamp, '%Y-%m-%d %H')
+            ORDER BY hour
+        ");
+            $responseTrends = $stmt->fetchAll();
+
+            error_log("Response trends: " . print_r($responseTrends, true));
+
+            $result = [
+                'systemStats' => $systemStats,
+                'categoryBreakdown' => $categoryBreakdown,
+                'responseTrends' => $responseTrends,
+                'success' => true,
+                'timestamp' => date('Y-m-d H:i:s')
+            ];
+
+            error_log("Final result: " . print_r($result, true));
+
+            echo json_encode($result);
+
+        } catch (Exception $e) {
+            error_log("ReportController::getSystemOverview error: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+
+            echo json_encode([
+                'error' => $e->getMessage(),
+                'success' => false,
+                'timestamp' => date('Y-m-d H:i:s'),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
     public function __construct() {
         $this->deviceModel = new DeviceModel();
         $this->db = Database::getInstance();
