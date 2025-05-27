@@ -250,10 +250,6 @@
         background: #333;
     }
 
-    .device-table tr.filtered-out {
-        display: none;
-    }
-
     .device-actions {
         display: flex;
         gap: 8px;
@@ -913,7 +909,7 @@ submitBtn.disabled = false;
 }
 });
 
-// Add device form submission (existing functionality)
+// Add device form submission
 document.getElementById('addDeviceForm').addEventListener('submit', async (e) => {
 e.preventDefault();
 
