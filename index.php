@@ -77,6 +77,10 @@ if ($page === 'login') {
             $controller = new ReportController();
             $controller->index();
             break;
+        case 'monitor_single_device':
+            $controller = new DeviceController();
+            $controller->monitorSingleDevice();
+            break;
         default:
             $controller = new DashboardController();
             $controller->index();

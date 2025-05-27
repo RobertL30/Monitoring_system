@@ -29,7 +29,10 @@ class MonitoringModel {
         
         $this->updateDeviceStatus($device, $result);
         $this->logMonitoringHistory($device['id'], $result);
-        
+
+        $status = $result['success'] ? 'operational' : 'down';
+        $result['status'] = $status;  // ← ADD THIS LINE
+
         return $result;
     }
     

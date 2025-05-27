@@ -2,6 +2,27 @@
 class DeviceController {
     private $deviceModel;
     private $monitoringModel;
+
+    public function monitorSingleDevice() {
+        $device_id = $_POST['device_id'] ?? 0;
+
+        if (!$device_id) {
+            echo json_encode(['success' => false, 'error' => 'No device ID provided']);
+            return;
+        }
+
+        // Get device details
+        $device = $this->deviceModel->getDeviceById($device_id);
+        if (!$device) {
+            echo json_encode(['success' => false, 'error' => 'Device not found']);
+            return;
+        }
+
+        // Monitor the device
+        $result = $this->monitoringModel->monitorDevice($device);
+
+        echo json_encode($result);
+    }
     
     public function __construct() {
         $this->deviceModel = new DeviceModel();

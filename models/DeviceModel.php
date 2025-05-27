@@ -6,6 +6,12 @@ class DeviceModel {
     public function __construct() {
         $this->db = Database::getInstance();
     }
+
+    public function getDeviceById($deviceId) {
+        $stmt = $this->db->prepare("SELECT * FROM devices WHERE id = ? AND enabled = 1");
+        $stmt->execute([$deviceId]);
+        return $stmt->fetch();
+    }
     
     public function getAllDevicesWithStatus() {
         $stmt = $this->db->query("
