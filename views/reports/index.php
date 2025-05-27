@@ -643,6 +643,191 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 
     <script>
+        // Debug function to test API endpoints
+        async function debugAPIEndpoints() {
+            console.log('=== DEBUGGING API ENDPOINTS ===');
+
+            // Test 1: Check if get_dashboard_data works
+            try {
+                console.log('Testing get_dashboard_data...');
+                const response = await fetch('?action=get_dashboard_data');
+                console.log('Dashboard response status:', response.status);
+                const data = await response.json();
+                console.log('Dashboard data:', data);
+
+                if (data.error) {
+                    console.error('Dashboard data error:', data.error);
+                } else {
+                    console.log('✓ Dashboard data loaded successfully');
+                    console.log('Device count:', data.stats.total);
+                    console.log('Device groups:', Object.keys(data.device_groups));
+                }
+            } catch (error) {
+                console.error('✗ Dashboard data failed:', error);
+            }
+
+            // Test 2: Check if get_system_overview works
+            try {
+                console.log('Testing get_system_overview...');
+                const response = await fetch('?action=get_system_overview');
+                console.log('System overview response status:', response.status);
+                const data = await response.json();
+                console.log('System overview data:', data);
+
+                if (data.error) {
+                    console.error('System overview error:', data.error);
+                } else {
+                    console.log('✓ System overview loaded successfully');
+                }
+            } catch (error) {
+                console.error('✗ System overview failed:', error);
+            }
+
+            // Test 3: Check if Chart.js is loaded
+            console.log('Chart.js available:', typeof Chart !== 'undefined');
+            if (typeof Chart === 'undefined') {
+                console.error('✗ Chart.js is not loaded!');
+            } else {
+                console.log('✓ Chart.js version:', Chart.version);
+            }
+        }
+
+        // Modified loadOverviewData function with debugging
+        async function loadOverviewData() {
+            console.log('loadOverviewData() called');
+
+            try {
+                console.log('Fetching dashboard data...');
+                const response = await fetch('?action=get_dashboard_data');
+                console.log('Response received:', response.status, response.statusText);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const responseText = await response.text();
+                console.log('Raw response:', responseText);
+
+                // Try to parse JSON
+                let dashboardData;
+                try {
+                    dashboardData = JSON.parse(responseText);
+                } catch (parseError) {
+                    console.error('JSON parse error:', parseError);
+                    console.error('Response was:', responseText);
+                    throw new Error('Invalid JSON response from server');
+                }
+
+                console.log('Parsed dashboard data:', dashboardData);
+
+                if (dashboardData.error) {
+                    throw new Error(dashboardData.error);
+                }
+
+                // Store globally
+                window.dashboardData = dashboardData;
+
+                console.log('Rendering overview components...');
+                renderOverviewStats();
+                renderCategoryGrid();
+                renderSystemCharts();
+
+                console.log('✓ Overview data loaded successfully');
+
+            } catch (error) {
+                console.error('✗ Error loading overview data:', error);
+                showError('Failed to load dashboard data: ' + error.message);
+
+                // Show detailed error in the UI
+                document.getElementById('overviewStats').innerHTML = `
+            <div style="color: #e74c3c; padding: 20px; background: #2a1a1a; border-radius: 8px;">
+                <h4>Error Loading Data</h4>
+                <p><strong>Error:</strong> ${error.message}</p>
+                <p><strong>Check:</strong></p>
+                <ul>
+                    <li>Open browser console (F12) for detailed logs</li>
+                    <li>Verify database connection</li>
+                    <li>Check if you're logged in</li>
+                    <li>Verify API endpoints are working</li>
+                </ul>
+                <button onclick="debugAPIEndpoints()" class="btn btn-secondary">Run Debug Tests</button>
+            </div>
+        `;
+
+                document.getElementById('categoryGrid').innerHTML = `
+            <div style="color: #e74c3c; text-align: center; padding: 20px;">
+                <p>Unable to load categories due to data loading error.</p>
+            </div>
+        `;
+            }
+        }
+
+        // Add debug button to the page
+        function addDebugButton() {
+            const debugButton = document.createElement('button');
+            debugButton.textContent = '🐛 Debug API';
+            debugButton.className = 'btn btn-secondary';
+            debugButton.style.position = 'fixed';
+            debugButton.style.top = '80px';
+            debugButton.style.right = '20px';
+            debugButton.style.zIndex = '9999';
+            debugButton.onclick = debugAPIEndpoints;
+            document.body.appendChild(debugButton);
+        }
+
+        // Initialize debugging when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Reports page DOM loaded');
+            addDebugButton();
+
+            // Add CSS to prevent body scrolling issues
+            document.body.style.overflowX = 'hidden';
+
+            // Load data with debugging
+            loadOverviewData();
+        });
+
+        // Test if fetch works at all
+        async function testBasicFetch() {
+            try {
+                const response = await fetch(window.location.href);
+                console.log('Basic fetch test - Status:', response.status);
+                return true;
+            } catch (error) {
+                console.error('Basic fetch failed:', error);
+                return false;
+            }
+        }
+
+        // Run basic tests immediately
+        console.log('Reports page script loaded');
+        console.log('Current URL:', window.location.href);
+        console.log('Browser supports fetch:', typeof fetch !== 'undefined');
+        testBasicFetch();
+
+
+// test script ends here !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+
+
+
         // Global state
         let currentView = 'overview';
         let currentCategory = null;

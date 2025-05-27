@@ -67,7 +67,7 @@ if ($page === 'login') {
                 $controller = new DeviceController();
                 $controller->editDevice();
                 break;
-            // New Reports API endpoints
+            // Reports API endpoints - using unique names
             case 'get_device_history_report':
                 $controller = new ReportController();
                 $controller->getDeviceHistory();
@@ -84,6 +84,8 @@ if ($page === 'login') {
                 $controller = new ReportController();
                 $controller->getSystemOverview();
                 break;
+            default:
+                echo json_encode(['error' => 'Unknown action: ' . $action]);
         }
         exit;
     }
