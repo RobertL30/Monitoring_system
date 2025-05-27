@@ -1138,10 +1138,9 @@
 
                 // Fetch real historical data from database
                 const [historyResponse, statsResponse] = await Promise.all([
-                    fetch(`?action=get_device_history&device_id=${deviceId}&hours=${timeRange}`),
+                    fetch(`?action=get_device_history_report&device_id=${deviceId}&hours=${timeRange}`),
                     fetch(`?action=get_device_stats&device_id=${deviceId}&hours=${timeRange}`)
                 ]);
-
                 const historyData = await historyResponse.json();
                 const statsData = await statsResponse.json();
 

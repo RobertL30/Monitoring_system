@@ -68,7 +68,7 @@ if ($page === 'login') {
                 $controller->editDevice();
                 break;
             // New Reports API endpoints
-            case 'get_device_history':
+            case 'get_device_history_report':
                 $controller = new ReportController();
                 $controller->getDeviceHistory();
                 break;
