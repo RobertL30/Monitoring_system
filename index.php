@@ -33,11 +33,11 @@ if ($page === 'login') {
 } else {
     // Require authentication for all other pages
     AuthController::requireLogin();
-    
+
     // Handle AJAX actions
     if ($action) {
         header('Content-Type: application/json');
-        
+
         switch ($action) {
             case 'monitor_all':
                 $controller = new DeviceController();
@@ -59,6 +59,10 @@ if ($page === 'login') {
                 $controller = new DeviceController();
                 $controller->getDeviceHistory();
                 break;
+            case 'monitor_single_device':  // ← ADD THIS HERE
+                $controller = new DeviceController();
+                $controller->monitorSingleDevice();
+                break;
         }
         exit;
     }
@@ -76,10 +80,6 @@ if ($page === 'login') {
         case 'reports':
             $controller = new ReportController();
             $controller->index();
-            break;
-        case 'monitor_single_device':
-            $controller = new DeviceController();
-            $controller->monitorSingleDevice();
             break;
         default:
             $controller = new DashboardController();

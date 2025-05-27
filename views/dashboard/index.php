@@ -45,22 +45,22 @@
     </div>
 </div>
 
-<script>
-    // Global variables
-    let autoMonitorInterval;
-    let isMonitoring = false;
-    let totalDevices = 0;
-    let checkedDevices = 0;
+    <script>
+        // Global variables
+        let autoMonitorInterval;
+        let isMonitoring = false;
+        let totalDevices = 0;
+        let checkedDevices = 0;
 
-    // Load dashboard data
-    async function loadDashboard() {
-        try {
-            const response = await fetch('?action=get_dashboard_data');
-            const data = await response.json();
+        // Load dashboard data (keep existing)
+        async function loadDashboard() {
+            try {
+                const response = await fetch('?action=get_dashboard_data');
+                const data = await response.json();
 
-            document.getElementById('loading').style.display = 'none';
+                document.getElementById('loading').style.display = 'none';
 
-            let html = `
+                let html = `
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number">${data.stats.total}</div>
@@ -81,220 +81,292 @@
             </div>
         `;
 
-            document.getElementById('content').innerHTML = html;
+                document.getElementById('content').innerHTML = html;
+                document.getElementById('lastUpdateTime').textContent =
+                    'Dashboard updated: ' + new Date().toLocaleString();
 
-            // Update last update time
-            document.getElementById('lastUpdateTime').textContent =
-                'Dashboard updated: ' + new Date().toLocaleString();
+                return data;
 
-            return data;
-
-        } catch (error) {
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('content').innerHTML =
-                '<p style="color: red; text-align: center;">Error loading dashboard: ' + error.message + '</p>';
-        }
-    }
-
-    // Start manual monitoring
-    async function startManualMonitoring() {
-        if (isMonitoring) return;
-
-        const data = await loadDashboard();
-        if (!data || data.stats.total === 0) {
-            alert('No devices to monitor. Add some devices first!');
-            return;
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').innerHTML =
+                    '<p style="color: red; text-align: center;">Error loading dashboard: ' + error.message + '</p>';
+            }
         }
 
-        isMonitoring = true;
-        totalDevices = data.stats.total;
-        checkedDevices = 0;
+        // Start manual monitoring with user warning
+        async function startManualMonitoring() {
+            if (isMonitoring) return;
 
-        // Show progress bar and results container
-        document.getElementById('progressContainer').style.display = 'block';
-        document.getElementById('monitoringResults').style.display = 'block';
-        document.getElementById('resultsContainer').innerHTML = '';
-
-        // Update button
-        const btn = document.getElementById('monitorBtn');
-        btn.textContent = '⏳ Monitoring...';
-        btn.disabled = true;
-
-        // Start monitoring individual devices
-        await monitorDevicesSequentially();
-
-        // Reset button
-        btn.textContent = '🔄 Check All Systems';
-        btn.disabled = false;
-
-        // Hide progress bar after 3 seconds
-        setTimeout(() => {
-            document.getElementById('progressContainer').style.display = 'none';
-        }, 3000);
-
-        isMonitoring = false;
-
-        // Refresh dashboard with new data
-        setTimeout(loadDashboard, 1000);
-    }
-
-    // Monitor devices one by one with live updates
-    async function monitorDevicesSequentially() {
-        try {
-            // Get device list
-            const response = await fetch('?action=get_dashboard_data');
-            const data = await response.json();
-
-            const devices = [];
-            Object.values(data.devices).forEach(deviceGroup => {
-                devices.push(...deviceGroup);
-            });
-
-            // Monitor each device
-            for (let i = 0; i < devices.length; i++) {
-                const device = devices[i];
-
-                // Update progress
-                updateProgress(i + 1, devices.length, `Checking ${device.name}...`);
-
-                // Monitor single device
-                await monitorSingleDevice(device);
-
-                // Small delay between checks to prevent overwhelming the network
-                await sleep(500);
+            const data = await loadDashboard();
+            if (!data || data.stats.total === 0) {
+                alert('No devices to monitor. Add some devices first!');
+                return;
             }
 
-            updateProgress(devices.length, devices.length, 'Monitoring complete!');
+            // Show user warning
+            const estimatedTime = Math.ceil(data.stats.total * 2); // ~2 seconds per device
+            const userConfirm = confirm(
+                `⚠️ MANUAL MONITORING WARNING ⚠️\n\n` +
+                `This will check ${data.stats.total} devices and may take ${estimatedTime}-${estimatedTime*2} seconds.\n` +
+                `The system will be less responsive during this time.\n\n` +
+                `Continue with manual monitoring?`
+            );
 
-        } catch (error) {
-            console.error('Monitoring error:', error);
-            addResult('Error', 'Failed to complete monitoring: ' + error.message, 'error');
+            if (!userConfirm) return;
+
+            isMonitoring = true;
+            totalDevices = data.stats.total;
+            checkedDevices = 0;
+
+            // Show progress bar and results container
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('monitoringResults').style.display = 'block';
+            document.getElementById('resultsContainer').innerHTML = '';
+
+            // Update button and disable other controls
+            const btn = document.getElementById('monitorBtn');
+            btn.textContent = '⏳ Monitoring...';
+            btn.disabled = true;
+
+            // Disable auto-monitoring during manual check
+            const autoCheckbox = document.getElementById('autoMonitor');
+            const wasAutoEnabled = autoCheckbox.checked;
+            autoCheckbox.checked = false;
+            autoCheckbox.disabled = true;
+
+            // Start staggered monitoring
+            await monitorDevicesStaggered();
+
+            // Reset controls
+            btn.textContent = '🔄 Check All Systems';
+            btn.disabled = false;
+            autoCheckbox.disabled = false;
+            autoCheckbox.checked = wasAutoEnabled;
+
+            // Hide progress bar after 3 seconds
+            setTimeout(() => {
+                document.getElementById('progressContainer').style.display = 'none';
+            }, 3000);
+
+            isMonitoring = false;
+
+            // Refresh dashboard with new data
+            setTimeout(loadDashboard, 1000);
         }
-    }
 
-    // Monitor a single device
-    async function monitorSingleDevice(device) {
-        try {
-            const formData = new FormData();
-            formData.append('device_id', device.id);
+        // NEW: Staggered monitoring to prevent system freeze
+        async function monitorDevicesStaggered() {
+            try {
+                // Get device list
+                const response = await fetch('?action=get_dashboard_data');
+                const data = await response.json();
 
-            const response = await fetch('?action=monitor_single_device', {
-                method: 'POST',
-                body: formData
-            });
+                const devices = [];
+                Object.values(data.devices).forEach(deviceGroup => {
+                    devices.push(...deviceGroup);
+                });
 
-            const result = await response.json();
+                // Process devices in batches to prevent system freeze
+                const batchSize = 3; // Monitor 3 devices simultaneously
+                const batches = [];
 
-            // Add result to display
-            const status = result.success ? 'operational' : 'down';
-            const statusText = result.success ? 'Online' : 'Offline';
-            const responseTime = result.response_time ? ` (${result.response_time}ms)` : '';
-            const lastCheck = new Date().toLocaleString();
+                for (let i = 0; i < devices.length; i += batchSize) {
+                    batches.push(devices.slice(i, i + batchSize));
+                }
 
-            addResult(device.name, `${statusText}${responseTime}`, status, lastCheck);
+                // Process each batch
+                for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+                    const batch = batches[batchIndex];
+                    const currentDeviceNumber = batchIndex * batchSize + 1;
 
-        } catch (error) {
-            addResult(device.name, 'Check failed: ' + error.message, 'error');
+                    updateProgress(
+                        currentDeviceNumber,
+                        devices.length,
+                        `Processing batch ${batchIndex + 1}/${batches.length} (${batch.length} devices)...`
+                    );
+
+                    // Start all devices in this batch simultaneously
+                    const batchPromises = batch.map(device => monitorSingleDevice(device));
+
+                    // Wait for all devices in this batch to complete
+                    await Promise.all(batchPromises);
+
+                    // Update progress after batch completion
+                    const completedDevices = Math.min((batchIndex + 1) * batchSize, devices.length);
+                    updateProgress(
+                        completedDevices,
+                        devices.length,
+                        `Completed ${completedDevices}/${devices.length} devices`
+                    );
+
+                    // Brief pause between batches to prevent overwhelming the system
+                    if (batchIndex < batches.length - 1) {
+                        await sleep(1500); // 1.5 second pause between batches
+                    }
+                }
+
+                updateProgress(devices.length, devices.length, 'All monitoring complete!');
+
+            } catch (error) {
+                console.error('Monitoring error:', error);
+                addResult('Error', 'Failed to complete monitoring: ' + error.message, 'error');
+            }
         }
-    }
 
-    // Update progress bar
-    function updateProgress(current, total, text) {
-        const percent = Math.round((current / total) * 100);
-        document.getElementById('progressText').textContent = text;
-        document.getElementById('progressPercent').textContent = percent + '%';
-        document.getElementById('progressBar').style.width = percent + '%';
-    }
+        // Monitor a single device (keep existing but add timing info)
+        async function monitorSingleDevice(device) {
+            const startTime = Date.now();
 
-    // Add monitoring result
-    function addResult(deviceName, status, statusClass, lastCheck = null) {
-        const container = document.getElementById('resultsContainer');
-        const resultDiv = document.createElement('div');
-        resultDiv.style.cssText = `
+            try {
+                const formData = new FormData();
+                formData.append('device_id', device.id);
+
+                const response = await fetch('?action=monitor_single_device', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                const checkDuration = Date.now() - startTime;
+
+                // Add result to display with attempt info
+                const status = result.success ? 'operational' : 'down';
+                const statusText = result.success ? 'Online' : 'Offline';
+                const responseTime = result.response_time ? ` (${result.response_time}ms)` : '';
+                const attempts = result.attempts ? ` [${result.attempts} attempts]` : '';
+                const lastCheck = new Date().toLocaleString();
+
+                addResult(
+                    device.name,
+                    `${statusText}${responseTime}${attempts}`,
+                    status,
+                    lastCheck,
+                    `Check took ${Math.round(checkDuration/1000)}s`
+                );
+
+            } catch (error) {
+                const checkDuration = Date.now() - startTime;
+                addResult(
+                    device.name,
+                    'Check failed: ' + error.message,
+                    'error',
+                    null,
+                    `Failed after ${Math.round(checkDuration/1000)}s`
+                );
+            }
+        }
+
+        // Update progress bar (keep existing)
+        function updateProgress(current, total, text) {
+            const percent = Math.round((current / total) * 100);
+            document.getElementById('progressText').textContent = text;
+            document.getElementById('progressPercent').textContent = percent + '%';
+            document.getElementById('progressBar').style.width = percent + '%';
+        }
+
+        // Add monitoring result with duration info
+        function addResult(deviceName, status, statusClass, lastCheck = null, duration = null) {
+            const container = document.getElementById('resultsContainer');
+            const resultDiv = document.createElement('div');
+            resultDiv.style.cssText = `
         display: flex;
         justify-content: space-between;
         padding: 8px 0;
         border-bottom: 1px solid #444;
     `;
 
-        const statusColor = {
-            'operational': '#00d4aa',
-            'down': '#e74c3c',
-            'error': '#f39c12'
-        }[statusClass] || '#888';
+            const statusColor = {
+                'operational': '#00d4aa',
+                'down': '#e74c3c',
+                'error': '#f39c12'
+            }[statusClass] || '#888';
 
-        const timeText = lastCheck ? `<small style="color: #888;">Last check: ${lastCheck}</small>` : '';
+            const timeText = lastCheck ? `<small style="color: #888;">Last check: ${lastCheck}</small>` : '';
+            const durationText = duration ? `<br><small style="color: #666;">${duration}</small>` : '';
 
-        resultDiv.innerHTML = `
+            resultDiv.innerHTML = `
         <div>
             <strong>${deviceName}</strong><br>
-            ${timeText}
+            ${timeText}${durationText}
         </div>
         <div style="color: ${statusColor}; font-weight: bold;">
             ${status}
         </div>
     `;
 
-        container.appendChild(resultDiv);
+            container.appendChild(resultDiv);
+            container.scrollTop = container.scrollHeight;
+        }
 
-        // Scroll to bottom
-        container.scrollTop = container.scrollHeight;
-    }
+        // Auto-monitoring functions (keep existing but reduce frequency for background)
+        function startAutoMonitoring() {
+            loadDashboard();
 
-    // Auto-monitoring setup
-    function setupAutoMonitoring() {
-        const checkbox = document.getElementById('autoMonitor');
+            // Reduced frequency for background monitoring (10 minutes instead of 5)
+            autoMonitorInterval = setInterval(() => {
+                if (!isMonitoring) {
+                    console.log('Auto-monitoring: Running quiet background check...');
+                    // For auto-monitoring, we'll use the existing monitor_all endpoint
+                    // which is faster and doesn't show the progress UI
+                    runQuietMonitoring();
+                }
+            }, 600000); // 10 minutes for auto-monitoring
 
-        checkbox.addEventListener('change', function() {
-            if (this.checked) {
-                startAutoMonitoring();
-            } else {
-                stopAutoMonitoring();
+            console.log('Auto-monitoring started (every 10 minutes)');
+        }
+
+        // Quiet monitoring for background auto-checks
+        async function runQuietMonitoring() {
+            try {
+                const response = await fetch('?action=monitor_all');
+                const data = await response.json();
+
+                console.log(`Auto-monitoring complete: ${data.total} devices checked`);
+
+                // Refresh dashboard silently
+                loadDashboard();
+
+            } catch (error) {
+                console.error('Auto-monitoring failed:', error);
             }
+        }
+
+        function stopAutoMonitoring() {
+            if (autoMonitorInterval) {
+                clearInterval(autoMonitorInterval);
+                autoMonitorInterval = null;
+                console.log('Auto-monitoring stopped');
+            }
+        }
+
+        function setupAutoMonitoring() {
+            const checkbox = document.getElementById('autoMonitor');
+
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    startAutoMonitoring();
+                } else {
+                    stopAutoMonitoring();
+                }
+            });
+
+            if (checkbox.checked) {
+                startAutoMonitoring();
+            }
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboard();
+            setupAutoMonitoring();
         });
 
-        // Start auto-monitoring by default
-        if (checkbox.checked) {
-            startAutoMonitoring();
-        }
-    }
-
-    function startAutoMonitoring() {
-        // Initial load
         loadDashboard();
-
-        // Set up interval for every 5 minutes (300,000 ms)
-        autoMonitorInterval = setInterval(() => {
-            if (!isMonitoring) {
-                console.log('Auto-monitoring: Running background check...');
-                startManualMonitoring();
-            }
-        }, 300000); // 5 minutes
-
-        console.log('Auto-monitoring started (every 5 minutes)');
-    }
-
-    function stopAutoMonitoring() {
-        if (autoMonitorInterval) {
-            clearInterval(autoMonitorInterval);
-            autoMonitorInterval = null;
-            console.log('Auto-monitoring stopped');
-        }
-    }
-
-    // Utility function
-    function sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    // Initialize everything when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        loadDashboard();
-        setupAutoMonitoring();
-    });
-
-    // Load initial data
-    loadDashboard();
-</script>
+    </script>
 
 <?php require_once 'views/layouts/footer.php'; ?>
