@@ -6,6 +6,9 @@ class DeviceModel {
     public function __construct() {
         $this->db = Database::getInstance();
     }
+    public function updateDevice($deviceId, $data) {
+        // Copy the updateDevice method from the third artifact
+    }
 
     public function getDeviceById($deviceId) {
         $stmt = $this->db->prepare("SELECT * FROM devices WHERE id = ? AND enabled = 1");

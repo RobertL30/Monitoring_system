@@ -23,6 +23,53 @@ class DeviceController {
 
         echo json_encode($result);
     }
+    public function editDevice() {
+        AuthController::requireAdmin();
+
+        $device_id = $_POST['device_id'] ?? 0;
+
+        if (!$device_id) {
+            echo json_encode(['success' => false, 'message' => 'Device ID is required']);
+            return;
+        }
+
+        $data = [
+            'name' => trim($_POST['name'] ?? ''),
+            'ip_address' => trim($_POST['ip_address'] ?? ''),
+            'device_group' => $_POST['device_group'] ?? '',
+            'monitor_type' => $_POST['monitor_type'] ?? '',
+            'location' => trim($_POST['location'] ?? ''),
+            'description' => trim($_POST['description'] ?? ''),
+            'critical_device' => isset($_POST['critical_device']) ? 1 : 0,
+            'port' => null
+        ];
+
+        if (!empty($_POST['port']) && is_numeric($_POST['port'])) {
+            $data['port'] = (int)$_POST['port'];
+        }
+
+        // Validate required fields
+        if (empty($data['name']) || empty($data['ip_address']) || empty($data['device_group']) || empty($data['monitor_type'])) {
+            echo json_encode(['success' => false, 'message' => 'Please fill in all required fields']);
+            return;
+        }
+
+        try {
+            $result = $this->deviceModel->updateDevice($device_id, $data);
+
+            if ($result) {
+                echo json_encode(['success' => true, 'message' => 'Device updated successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to update device']);
+            }
+        } catch (PDOException $e) {
+            if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                echo json_encode(['success' => false, 'message' => 'IP address already exists']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+            }
+        }
+    }
     
     public function __construct() {
         $this->deviceModel = new DeviceModel();

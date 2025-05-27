@@ -63,6 +63,10 @@ if ($page === 'login') {
                 $controller = new DeviceController();
                 $controller->monitorSingleDevice();
                 break;
+            case 'edit_device':
+                $controller = new DeviceController();
+                $controller->editDevice();
+                break;
         }
         exit;
     }

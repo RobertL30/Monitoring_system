@@ -823,7 +823,12 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            loadDashboard();
+            loadDashboard().then(() => {
+                // Auto-expand total devices on page load
+                setTimeout(() => {
+                    filterDevices('all');
+                }, 500); // Small delay to ensure dashboard is fully loaded
+            });
             setupAutoMonitoring();
         });
 
