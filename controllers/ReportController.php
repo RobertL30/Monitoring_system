@@ -1,5 +1,5 @@
 <?php
-class ReportsController {
+class ReportController {
     private $deviceModel;
     private $db;
 
