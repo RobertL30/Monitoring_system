@@ -59,7 +59,7 @@ if ($page === 'login') {
                 $controller = new DeviceController();
                 $controller->getDeviceHistory();
                 break;
-            case 'monitor_single_device':  // ← ADD THIS HERE
+            case 'monitor_single_device':
                 $controller = new DeviceController();
                 $controller->monitorSingleDevice();
                 break;
@@ -67,10 +67,27 @@ if ($page === 'login') {
                 $controller = new DeviceController();
                 $controller->editDevice();
                 break;
+            // New Reports API endpoints
+            case 'get_device_history':
+                $controller = new ReportController();
+                $controller->getDeviceHistory();
+                break;
+            case 'get_device_stats':
+                $controller = new ReportController();
+                $controller->getDeviceStats();
+                break;
+            case 'get_category_stats':
+                $controller = new ReportController();
+                $controller->getCategoryStats();
+                break;
+            case 'get_system_overview':
+                $controller = new ReportController();
+                $controller->getSystemOverview();
+                break;
         }
         exit;
     }
-    
+
     // Route to appropriate page controller
     switch ($page) {
         case 'dashboard':
