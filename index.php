@@ -5,6 +5,7 @@ require_once 'models/Database.php';
 require_once 'models/UserModel.php';
 require_once 'models/DeviceModel.php';
 require_once 'models/MonitoringModel.php';
+require_once 'models/AlertModel.php';
 require_once 'controllers/AuthController.php';
 require_once 'controllers/DashboardController.php';
 require_once 'controllers/DeviceController.php';
