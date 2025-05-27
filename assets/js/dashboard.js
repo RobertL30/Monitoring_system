@@ -36,7 +36,47 @@ async function loadDashboard() {
 }
 
 async function runMonitoring() {
-    alert('Monitoring feature ready! Add some devices first.');
+    const btn = document.querySelector('.btn');
+    const originalText = btn.textContent;
+
+    // Show loading state
+    btn.textContent = '🔄 Checking...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('?action=monitor_all');
+        const data = await response.json();
+
+        // Check if no devices exist
+        if (data.total === 0) {
+            alert('Monitoring feature ready! Add some devices first.');
+            return;
+        }
+
+        // Show monitoring results
+        let message = `Monitoring Complete!\n\n`;
+        message += `Total devices checked: ${data.total}\n\n`;
+
+        data.results.forEach(result => {
+            message += `${result.device}: ${result.status}`;
+            if (result.response_time) {
+                message += ` (${result.response_time}ms)`;
+            }
+            message += '\n';
+        });
+
+        alert(message);
+
+        // Refresh dashboard data to show updated status
+        loadDashboard();
+
+    } catch (error) {
+        alert('Error running monitoring: ' + error.message);
+    } finally {
+        // Restore button
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
 }
 
 // Load initial data
