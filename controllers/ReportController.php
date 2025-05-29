@@ -3,6 +3,14 @@ class ReportController {
     private $deviceModel;
     private $db;
 
+    public function __construct() {
+        $this->deviceModel = new DeviceModel();
+        $this->db = Database::getInstance();
+    }
+
+    public function index() {
+        require_once 'views/reports/index.php';
+    }
 
     public function debugInfo() {
         try {
@@ -12,15 +20,15 @@ class ReportController {
 
             // Test dashboard data
             $stmt = $this->db->query("
-            SELECT 
-                COUNT(*) as total_devices,
-                SUM(CASE WHEN ds.status = 'operational' THEN 1 ELSE 0 END) as operational,
-                SUM(CASE WHEN ds.status = 'degraded' THEN 1 ELSE 0 END) as degraded,
-                SUM(CASE WHEN ds.status = 'down' THEN 1 ELSE 0 END) as down
-            FROM devices d
-            LEFT JOIN device_status ds ON d.id = ds.device_id
-            WHERE d.enabled = 1
-        ");
+                SELECT 
+                    COUNT(*) as total_devices,
+                    SUM(CASE WHEN ds.status = 'operational' THEN 1 ELSE 0 END) as operational,
+                    SUM(CASE WHEN ds.status = 'degraded' THEN 1 ELSE 0 END) as degraded,
+                    SUM(CASE WHEN ds.status = 'down' THEN 1 ELSE 0 END) as down
+                FROM devices d
+                LEFT JOIN device_status ds ON d.id = ds.device_id
+                WHERE d.enabled = 1
+            ");
             $stats = $stmt->fetch();
 
             echo json_encode([
@@ -46,57 +54,56 @@ class ReportController {
         }
     }
 
-// Modified getSystemOverview with better error handling
     public function getSystemOverview() {
         try {
             error_log("ReportController::getSystemOverview called");
 
             // Get overall system stats
             $stmt = $this->db->query("
-            SELECT 
-                COUNT(*) as total_devices,
-                SUM(CASE WHEN ds.status = 'operational' THEN 1 ELSE 0 END) as operational,
-                SUM(CASE WHEN ds.status = 'degraded' THEN 1 ELSE 0 END) as degraded,
-                SUM(CASE WHEN ds.status = 'down' THEN 1 ELSE 0 END) as down,
-                SUM(CASE WHEN ds.status IS NULL OR ds.status = 'unknown' THEN 1 ELSE 0 END) as unknown,
-                AVG(CASE WHEN ds.status = 'operational' THEN ds.response_time END) as avg_response_time,
-                SUM(CASE WHEN d.critical_device = 1 AND ds.status != 'operational' THEN 1 ELSE 0 END) as critical_issues
-            FROM devices d
-            LEFT JOIN device_status ds ON d.id = ds.device_id
-            WHERE d.enabled = 1
-        ");
+                SELECT 
+                    COUNT(*) as total_devices,
+                    SUM(CASE WHEN ds.status = 'operational' THEN 1 ELSE 0 END) as operational,
+                    SUM(CASE WHEN ds.status = 'degraded' THEN 1 ELSE 0 END) as degraded,
+                    SUM(CASE WHEN ds.status = 'down' THEN 1 ELSE 0 END) as down,
+                    SUM(CASE WHEN ds.status IS NULL OR ds.status = 'unknown' THEN 1 ELSE 0 END) as unknown,
+                    AVG(CASE WHEN ds.status = 'operational' THEN ds.response_time END) as avg_response_time,
+                    SUM(CASE WHEN d.critical_device = 1 AND ds.status != 'operational' THEN 1 ELSE 0 END) as critical_issues
+                FROM devices d
+                LEFT JOIN device_status ds ON d.id = ds.device_id
+                WHERE d.enabled = 1
+            ");
             $systemStats = $stmt->fetch();
 
             error_log("System stats: " . print_r($systemStats, true));
 
             // Get category breakdown
             $stmt = $this->db->query("
-            SELECT 
-                d.device_group,
-                COUNT(*) as device_count,
-                SUM(CASE WHEN ds.status = 'operational' THEN 1 ELSE 0 END) as operational,
-                SUM(CASE WHEN ds.status = 'degraded' THEN 1 ELSE 0 END) as degraded,
-                SUM(CASE WHEN ds.status = 'down' THEN 1 ELSE 0 END) as down
-            FROM devices d
-            LEFT JOIN device_status ds ON d.id = ds.device_id
-            WHERE d.enabled = 1
-            GROUP BY d.device_group
-        ");
+                SELECT 
+                    d.device_group,
+                    COUNT(*) as device_count,
+                    SUM(CASE WHEN ds.status = 'operational' THEN 1 ELSE 0 END) as operational,
+                    SUM(CASE WHEN ds.status = 'degraded' THEN 1 ELSE 0 END) as degraded,
+                    SUM(CASE WHEN ds.status = 'down' THEN 1 ELSE 0 END) as down
+                FROM devices d
+                LEFT JOIN device_status ds ON d.id = ds.device_id
+                WHERE d.enabled = 1
+                GROUP BY d.device_group
+            ");
             $categoryBreakdown = $stmt->fetchAll();
 
             error_log("Category breakdown: " . print_r($categoryBreakdown, true));
 
             // Get recent system-wide response times for trending
             $stmt = $this->db->query("
-            SELECT 
-                DATE_FORMAT(timestamp, '%H:00') as hour,
-                AVG(response_time) as avg_response_time
-            FROM monitoring_history 
-            WHERE timestamp > DATE_SUB(NOW(), INTERVAL 24 HOUR)
-            AND success = 1
-            GROUP BY DATE_FORMAT(timestamp, '%Y-%m-%d %H')
-            ORDER BY hour
-        ");
+                SELECT 
+                    DATE_FORMAT(timestamp, '%H:00') as hour,
+                    AVG(response_time) as avg_response_time
+                FROM monitoring_history 
+                WHERE timestamp > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                AND success = 1
+                GROUP BY DATE_FORMAT(timestamp, '%Y-%m-%d %H')
+                ORDER BY hour
+            ");
             $responseTrends = $stmt->fetchAll();
 
             error_log("Response trends: " . print_r($responseTrends, true));
@@ -124,15 +131,6 @@ class ReportController {
                 'trace' => $e->getTraceAsString()
             ]);
         }
-    }
-
-    public function __construct() {
-        $this->deviceModel = new DeviceModel();
-        $this->db = Database::getInstance();
-    }
-
-    public function index() {
-        require_once 'views/reports/index.php';
     }
 
     public function getDeviceHistory() {
@@ -370,63 +368,6 @@ class ReportController {
                 'stats' => $categoryStats,
                 'category' => $category,
                 'timeRange' => $hours
-            ]);
-
-        } catch (Exception $e) {
-            echo json_encode(['error' => $e->getMessage()]);
-        }
-    }
-
-    public function getSystemOverview() {
-        try {
-            // Get overall system stats
-            $stmt = $this->db->query("
-                SELECT 
-                    COUNT(*) as total_devices,
-                    SUM(CASE WHEN ds.status = 'operational' THEN 1 ELSE 0 END) as operational,
-                    SUM(CASE WHEN ds.status = 'degraded' THEN 1 ELSE 0 END) as degraded,
-                    SUM(CASE WHEN ds.status = 'down' THEN 1 ELSE 0 END) as down,
-                    SUM(CASE WHEN ds.status IS NULL OR ds.status = 'unknown' THEN 1 ELSE 0 END) as unknown,
-                    AVG(CASE WHEN ds.status = 'operational' THEN ds.response_time END) as avg_response_time,
-                    SUM(CASE WHEN d.critical_device = 1 AND ds.status != 'operational' THEN 1 ELSE 0 END) as critical_issues
-                FROM devices d
-                LEFT JOIN device_status ds ON d.id = ds.device_id
-                WHERE d.enabled = 1
-            ");
-            $systemStats = $stmt->fetch();
-
-            // Get category breakdown
-            $stmt = $this->db->query("
-                SELECT 
-                    d.device_group,
-                    COUNT(*) as device_count,
-                    SUM(CASE WHEN ds.status = 'operational' THEN 1 ELSE 0 END) as operational,
-                    SUM(CASE WHEN ds.status = 'degraded' THEN 1 ELSE 0 END) as degraded,
-                    SUM(CASE WHEN ds.status = 'down' THEN 1 ELSE 0 END) as down
-                FROM devices d
-                LEFT JOIN device_status ds ON d.id = ds.device_id
-                WHERE d.enabled = 1
-                GROUP BY d.device_group
-            ");
-            $categoryBreakdown = $stmt->fetchAll();
-
-            // Get recent system-wide response times for trending
-            $stmt = $this->db->query("
-                SELECT 
-                    DATE_FORMAT(timestamp, '%H:00') as hour,
-                    AVG(response_time) as avg_response_time
-                FROM monitoring_history 
-                WHERE timestamp > DATE_SUB(NOW(), INTERVAL 24 HOUR)
-                AND success = 1
-                GROUP BY DATE_FORMAT(timestamp, '%Y-%m-%d %H')
-                ORDER BY hour
-            ");
-            $responseTrends = $stmt->fetchAll();
-
-            echo json_encode([
-                'systemStats' => $systemStats,
-                'categoryBreakdown' => $categoryBreakdown,
-                'responseTrends' => $responseTrends
             ]);
 
         } catch (Exception $e) {
